@@ -98,6 +98,11 @@ class ElasticORMServiceProvider extends ServiceProvider
             __DIR__ . '/../config/elastic-orm.php' => config_path('elastic-orm.php'),
         ], 'config');
 
+        // Publish migrations
+        $this->publishes([
+            __DIR__ . '/../database/migrations' => database_path('migrations'),
+        ], 'migrations');
+
         // Load migrations
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
 
