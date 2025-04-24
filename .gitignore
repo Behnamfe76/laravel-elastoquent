@@ -15,3 +15,6 @@ yarn-error.log
 /.vscode
 .DS_Store
 .phpstan-cache/ /vendor/composer/autoload_*.php
+
+# Composer autoload files
+vendor/composer/autoload_*.php
