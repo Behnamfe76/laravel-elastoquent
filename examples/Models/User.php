@@ -10,6 +10,7 @@ use Fereydooni\LaravelElastoquent\Attributes\ElasticsearchIndex;
 use Fereydooni\LaravelElastoquent\Attributes\ElasticsearchType;
 use Fereydooni\LaravelElastoquent\Attributes\ElasticsearchMapping;
 use Fereydooni\LaravelElastoquent\Attributes\ElasticsearchSettings;
+use Fereydooni\LaravelElastoquent\Enums\ElasticsearchFieldType;
 use Spatie\LaravelData\Data;
 use Spatie\LaravelData\Attributes\MapInputName;
 use Spatie\LaravelData\Attributes\MapOutputName;
@@ -69,31 +70,31 @@ class User extends Model
     #[ElasticsearchId]
     protected ?string $id = null;
 
-    #[ElasticsearchField(type: 'text')]
+    #[ElasticsearchField(type: ElasticsearchFieldType::TEXT)]
     protected string $name;
 
-    #[ElasticsearchField(type: 'keyword')]
+    #[ElasticsearchField(type: ElasticsearchFieldType::KEYWORD)]
     protected string $email;
 
-    #[ElasticsearchField(type: 'keyword')]
+    #[ElasticsearchField(type: ElasticsearchFieldType::KEYWORD)]
     protected string $password;
 
-    #[ElasticsearchField(type: 'integer')]
+    #[ElasticsearchField(type: ElasticsearchFieldType::INTEGER)]
     protected int $age;
 
-    #[ElasticsearchField(type: 'boolean')]
+    #[ElasticsearchField(type: ElasticsearchFieldType::BOOLEAN)]
     protected bool $isActive;
 
-    #[ElasticsearchField(type: 'date')]
+    #[ElasticsearchField(type: ElasticsearchFieldType::DATE)]
     protected \DateTime $createdAt;
 
-    #[ElasticsearchField(type: 'date')]
+    #[ElasticsearchField(type: ElasticsearchFieldType::DATE)]
     protected \DateTime $updatedAt;
 
-    #[ElasticsearchField(type: 'keyword')]
+    #[ElasticsearchField(type: ElasticsearchFieldType::KEYWORD)]
     protected array $roles = [];
 
-    #[ElasticsearchField(type: 'nested')]
+    #[ElasticsearchField(type: ElasticsearchFieldType::NESTED)]
     protected array $profile = [];
 
     public function __construct(array $attributes = [])
