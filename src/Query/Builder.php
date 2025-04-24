@@ -90,6 +90,11 @@ class Builder
     protected ?Client $httpClient = null;
 
     /**
+     * The relationships that should be eager loaded.
+     */
+    protected array $with = [];
+
+    /**
      * Create a new Elasticsearch query builder instance.
      */
     public function __construct(ElasticManager $elasticManager)
@@ -259,7 +264,9 @@ class Builder
     public function whereNull(string $field): self
     {
         $this->query['query']['bool']['must_not'][] = [
-            'exists' => ['field' => $field],
+            'exists' => [
+                'field' => $field
+            ]
         ];
 
         return $this;
@@ -271,7 +278,9 @@ class Builder
     public function whereNotNull(string $field): self
     {
         $this->query['query']['bool']['must'][] = [
-            'exists' => ['field' => $field],
+            'exists' => [
+                'field' => $field
+            ]
         ];
 
         return $this;
@@ -1432,6 +1441,278 @@ class Builder
                 'name' => 'collapsed',
                 'size' => 5
             ], $innerHitsOptions)
+        ];
+
+        return $this;
+    }
+
+    /**
+     * Get the model being queried.
+     */
+    public function getModel(): string
+    {
+        return $this->model;
+    }
+
+    /**
+     * Add a where in clause to the query.
+     */
+    public function whereIn(string $field, array $values): self
+    {
+        $this->query['query']['bool']['must'][] = [
+            'terms' => [
+                $field => $values
+            ]
+        ];
+
+        return $this;
+    }
+
+    /**
+     * Find a model by its primary key.
+     */
+    public function find(string $id)
+    {
+        $this->where('_id', $id);
+        return $this->first();
+    }
+
+    /**
+     * Find a model by its primary key or throw an exception.
+     */
+    public function findOrFail(string $id)
+    {
+        if ($model = $this->find($id)) {
+            return $model;
+        }
+
+        throw new \Exception("No query results for model [{$this->model}] {$id}");
+    }
+
+    /**
+     * Get the first result of the query or throw an exception.
+     */
+    public function firstOrFail()
+    {
+        if ($model = $this->first()) {
+            return $model;
+        }
+
+        throw new \Exception("No query results for model [{$this->model}]");
+    }
+
+    /**
+     * Get a single column's value from the first result of a query.
+     */
+    public function value(string $column)
+    {
+        if ($result = $this->first()) {
+            return $result->getAttribute($column);
+        }
+
+        return null;
+    }
+
+    /**
+     * Determine if any rows exist for the current query.
+     */
+    public function exists(): bool
+    {
+        return $this->count() > 0;
+    }
+
+    /**
+     * Determine if no rows exist for the current query.
+     */
+    public function doesntExist(): bool
+    {
+        return !$this->exists();
+    }
+
+    /**
+     * Execute a chunk over the results.
+     */
+    public function chunk(int $count, callable $callback): bool
+    {
+        $page = 1;
+
+        do {
+            $results = $this->forPage($page, $count)->get();
+
+            if ($results->isEmpty()) {
+                break;
+            }
+
+            if ($callback($results, $page) === false) {
+                return false;
+            }
+
+            $page++;
+        } while ($results->count() === $count);
+
+        return true;
+    }
+
+    /**
+     * Execute a chunk over the results using a cursor.
+     */
+    public function cursor(): \Generator
+    {
+        $page = 1;
+        $count = 100;
+
+        do {
+            $results = $this->forPage($page, $count)->get();
+
+            if ($results->isEmpty()) {
+                break;
+            }
+
+            foreach ($results as $result) {
+                yield $result;
+            }
+
+            $page++;
+        } while ($results->count() === $count);
+    }
+
+    /**
+     * Create a new length-aware simple paginator instance.
+     */
+    public function simplePaginate(int $perPage = 15, int $page = null): LengthAwarePaginator
+    {
+        $page = $page ?: Request::input('page', 1);
+        $this->forPage($page, $perPage);
+
+        $results = $this->get();
+        $total = $this->count();
+
+        return new LengthAwarePaginator(
+            $results,
+            $total,
+            $perPage,
+            $page,
+            [
+                'path' => Request::path(),
+                'pageName' => 'page',
+            ]
+        );
+    }
+
+    /**
+     * Create a new cursor paginator instance.
+     */
+    public function cursorPaginate(int $perPage = 15, string $cursor = null): \Illuminate\Pagination\CursorPaginator
+    {
+        $cursor = $cursor ?: Request::input('cursor');
+
+        if ($cursor) {
+            $this->searchAfter([$cursor]);
+        }
+
+        $this->limit($perPage + 1);
+        $results = $this->get();
+
+        return new \Illuminate\Pagination\CursorPaginator(
+            $results->take($perPage),
+            $perPage,
+            $cursor,
+            [
+                'path' => Request::path(),
+                'cursorName' => 'cursor',
+                'parameters' => ['cursor'],
+            ]
+        );
+    }
+
+    /**
+     * Set the relationships that should be eager loaded.
+     */
+    public function with(array $relations): self
+    {
+        $this->with = $relations;
+        return $this;
+    }
+
+    /**
+     * Add a relationship count condition to the query.
+     */
+    public function has(string $relation, string $operator = '>=', int $count = 1): self
+    {
+        return $this->whereHas($relation, function ($query) use ($operator, $count) {
+            $query->where('_count', $operator, $count);
+        });
+    }
+
+    /**
+     * Add a relationship count condition to the query with an "or".
+     */
+    public function orHas(string $relation, string $operator = '>=', int $count = 1): self
+    {
+        return $this->orWhereHas($relation, function ($query) use ($operator, $count) {
+            $query->where('_count', $operator, $count);
+        });
+    }
+
+    /**
+     * Add a relationship count condition to the query.
+     */
+    public function doesntHave(string $relation): self
+    {
+        return $this->whereDoesntHave($relation);
+    }
+
+    /**
+     * Force the query to only return distinct results.
+     */
+    public function distinct(): self
+    {
+        $this->query['collapse'] = [
+            'field' => '_id'
+        ];
+        return $this;
+    }
+
+    /**
+     * Add a relationship count condition to the query.
+     */
+    public function whereHas(string $relation, callable $callback = null): self
+    {
+        $this->query['query']['bool']['must'][] = [
+            'nested' => [
+                'path' => $relation,
+                'query' => $callback ? $callback($this) : ['match_all' => new \stdClass()]
+            ]
+        ];
+
+        return $this;
+    }
+
+    /**
+     * Add a relationship count condition to the query with an "or".
+     */
+    public function orWhereHas(string $relation, callable $callback = null): self
+    {
+        $this->query['query']['bool']['should'][] = [
+            'nested' => [
+                'path' => $relation,
+                'query' => $callback ? $callback($this) : ['match_all' => new \stdClass()]
+            ]
+        ];
+
+        return $this;
+    }
+
+    /**
+     * Add a relationship count condition to the query.
+     */
+    public function whereDoesntHave(string $relation): self
+    {
+        $this->query['query']['bool']['must_not'][] = [
+            'nested' => [
+                'path' => $relation,
+                'query' => ['match_all' => new \stdClass()]
+            ]
         ];
 
         return $this;

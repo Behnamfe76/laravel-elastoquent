@@ -7,6 +7,7 @@ namespace Fereydooni\LaravelElastoquent\Models;
 use Fereydooni\LaravelElastoquent\Attributes\ElasticField;
 use Fereydooni\LaravelElastoquent\Attributes\ElasticModel;
 use Fereydooni\LaravelElastoquent\Managers\ElasticManager;
+use Fereydooni\LaravelElastoquent\Models\Concerns\HasRelations;
 use Fereydooni\LaravelElastoquent\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -16,6 +17,7 @@ use ReflectionProperty;
 
 abstract class Model
 {
+    use HasRelations;
     /**
      * The model's attributes.
      */
@@ -31,7 +33,7 @@ abstract class Model
      */
     protected string $primaryKey = '_id';
 
-    /**
+    /**f
      * The model's ID.
      */
     protected ?string $id = null;
@@ -133,9 +135,8 @@ abstract class Model
             return $this->attributes[$key];
         }
 
-        // Check for dynamic property
-        if (property_exists($this, $key)) {
-            return $this->$key;
+        if (method_exists($this, $key)) {
+            return $this->getRelationValue($key);
         }
 
         return null;
@@ -364,6 +365,46 @@ abstract class Model
     }
 
     /**
+     * Force a hard delete on a soft deleted model.
+     */
+    public function forceDelete(): bool
+    {
+        return $this->delete();
+    }
+
+    /**
+     * Destroy the models for the given IDs.
+     */
+    public static function destroy(array|string $ids): int
+    {
+        $count = 0;
+
+        if ($ids instanceof Collection) {
+            $ids = $ids->all();
+        }
+
+        $ids = is_array($ids) ? $ids : func_get_args();
+
+        foreach ($ids as $id) {
+            if ($model = static::find($id)) {
+                if ($model->delete()) {
+                    $count++;
+                }
+            }
+        }
+
+        return $count;
+    }
+
+    /**
+     * Truncate the model's table.
+     */
+    public static function truncate(): bool
+    {
+        return static::getElasticManager()->deleteIndex(static::getIndexName());
+    }
+
+    /**
      * Get a new query builder for the model.
      */
     public static function query(): Builder
@@ -377,6 +418,118 @@ abstract class Model
     public static function where(string $field, $operator = null, $value = null): Builder
     {
         return static::query()->where($field, $operator, $value);
+    }
+
+    /**
+     * Add an "or where" clause to the query.
+     */
+    public static function orWhere(string $field, $operator = null, $value = null): Builder
+    {
+        return static::query()->orWhere($field, $operator, $value);
+    }
+
+    /**
+     * Add a "where in" clause to the query.
+     */
+    public static function whereIn(string $field, array $values): Builder
+    {
+        return static::query()->whereIn($field, $values);
+    }
+
+    /**
+     * Add a "where null" clause to the query.
+     */
+    public static function whereNull(string $field): Builder
+    {
+        return static::query()->whereNull($field);
+    }
+
+    /**
+     * Add a "where not null" clause to the query.
+     */
+    public static function whereNotNull(string $field): Builder
+    {
+        return static::query()->whereNotNull($field);
+    }
+
+    /**
+     * Set the relationships that should be eager loaded.
+     */
+    public static function with(array $relations): Builder
+    {
+        return static::query()->with($relations);
+    }
+
+    /**
+     * Add a relationship count condition to the query.
+     */
+    public static function has(string $relation, string $operator = '>=', int $count = 1): Builder
+    {
+        return static::query()->has($relation, $operator, $count);
+    }
+
+    /**
+     * Add a relationship count condition to the query with an "or".
+     */
+    public static function orHas(string $relation, string $operator = '>=', int $count = 1): Builder
+    {
+        return static::query()->orHas($relation, $operator, $count);
+    }
+
+    /**
+     * Add a relationship count condition to the query.
+     */
+    public static function doesntHave(string $relation): Builder
+    {
+        return static::query()->doesntHave($relation);
+    }
+
+    /**
+     * Add an "order by" clause to the query.
+     */
+    public static function orderBy(string $field, string $direction = 'asc'): Builder
+    {
+        return static::query()->orderBy($field, $direction);
+    }
+
+    /**
+     * Add a "limit" clause to the query.
+     */
+    public static function limit(int $value): Builder
+    {
+        return static::query()->limit($value);
+    }
+
+    /**
+     * Add an "offset" clause to the query.
+     */
+    public static function offset(int $value): Builder
+    {
+        return static::query()->offset($value);
+    }
+
+    /**
+     * Set the "limit" and "offset" for a given page.
+     */
+    public static function forPage(int $page, int $perPage = 15): Builder
+    {
+        return static::query()->forPage($page, $perPage);
+    }
+
+    /**
+     * Include only specified source fields in the results.
+     */
+    public static function select(array $fields): Builder
+    {
+        return static::query()->select($fields);
+    }
+
+    /**
+     * Force the query to only return distinct results.
+     */
+    public static function distinct(): Builder
+    {
+        return static::query()->distinct();
     }
 
     /**
@@ -516,5 +669,145 @@ abstract class Model
         return $this->getId() === $model->getId() && 
                static::class === get_class($model) &&
                static::getIndexName() === $model::getIndexName();
+    }
+
+    /**
+     * Create a new collection instance.
+     */
+    public function newCollection(array $models = []): Collection
+    {
+        return new Collection($models);
+    }
+
+    /**
+     * Create a new model instance.
+     */
+    public static function make(array $attributes = []): self
+    {
+        return new static($attributes);
+    }
+
+    /**
+     * Create a new model instance and save it to Elasticsearch.
+     */
+    public static function forceCreate(array $attributes = []): self
+    {
+        $model = new static($attributes);
+        $model->save();
+        return $model;
+    }
+
+    /**
+     * Get the first record matching the attributes or create it.
+     */
+    public static function firstOrCreate(array $attributes, array $values = []): self
+    {
+        $query = static::query();
+        
+        foreach ($attributes as $key => $value) {
+            $query->where($key, $value);
+        }
+        
+        if ($model = $query->first()) {
+            return $model;
+        }
+        
+        return static::create(array_merge($attributes, $values));
+    }
+
+    /**
+     * Get the first record matching the attributes or instantiate it.
+     */
+    public static function firstOrNew(array $attributes, array $values = []): self
+    {
+        $query = static::query();
+        
+        foreach ($attributes as $key => $value) {
+            $query->where($key, $value);
+        }
+        
+        if ($model = $query->first()) {
+            return $model;
+        }
+        
+        return new static(array_merge($attributes, $values));
+    }
+
+    /**
+     * Create or update a record matching the attributes, and fill it with values.
+     */
+    public static function updateOrCreate(array $attributes, array $values = []): self
+    {
+        $query = static::query();
+        
+        foreach ($attributes as $key => $value) {
+            $query->where($key, $value);
+        }
+        
+        if ($model = $query->first()) {
+            $model->fill($values)->save();
+            return $model;
+        }
+        
+        return static::create(array_merge($attributes, $values));
+    }
+
+    /**
+     * Update the model in the database.
+     */
+    public function update(array $attributes = []): bool
+    {
+        if (!$this->exists) {
+            return false;
+        }
+
+        return $this->fill($attributes)->save();
+    }
+
+    /**
+     * Update the model and push the changes to the database.
+     */
+    public function push(): bool
+    {
+        if (!$this->exists) {
+            return false;
+        }
+
+        $dirty = $this->getDirty();
+
+        if (empty($dirty)) {
+            return true;
+        }
+
+        return $this->save();
+    }
+
+    /**
+     * Touch the model's timestamp.
+     */
+    public function touch(): bool
+    {
+        if (!$this->exists) {
+            return false;
+        }
+
+        $this->setAttribute('updated_at', now()->toIso8601String());
+        return $this->save();
+    }
+
+    /**
+     * Get the attributes that have been changed since the last sync.
+     */
+    public function getDirty(): array
+    {
+        $dirty = [];
+
+        foreach ($this->attributes as $key => $value) {
+            if (!array_key_exists($key, $this->original) || $value !== $this->original[$key]) {
+                $dirty[$key] = $value;
+            }
+        }
+
+        return $dirty;
     }
 } 
