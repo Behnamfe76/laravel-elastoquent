@@ -1,20 +1,30 @@
 /vendor/
-/.phpunit.cache
-/node_modules
-/public/build
-/public/hot
-.phpunit.result.cache
-Homestead.json
-Homestead.yaml
+node_modules/
 npm-debug.log
 yarn-error.log
+
+# Laravel 4 specific
+bootstrap/compiled.php
+app/storage/
+
+# Laravel 5 & Lumen specific
+public/storage
+public/hot
+
+# Laravel 5 & Lumen specific with changed public path
+public_html/storage
+public_html/hot
+
+storage/*.key
 .env
+Homestead.yaml
+Homestead.json
+/.vagrant
+.phpunit.result.cache
+
+/public/build
+/storage/pail
 .env.backup
 .env.production
-/.idea
-/.vscode
-.DS_Store
-.phpstan-cache/ /vendor/composer/autoload_*.php
-
-# Composer autoload files
-vendor/composer/autoload_*.php
+.phpactor.json
+auth.json
