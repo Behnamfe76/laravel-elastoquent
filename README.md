@@ -319,6 +319,118 @@ User::bulkIndex([
 ]);
 ```
 
+## User Model Example
+
+Here's an example of how to use the User model with Elasticsearch and Spatie Data:
+
+```php
+use Fereydooni\LaravelElastoquent\Examples\Models\User;
+use Fereydooni\LaravelElastoquent\Examples\Models\UserData;
+
+// Create a new user
+$user = new User([
+    'name' => 'John Doe',
+    'email' => 'john@example.com',
+    'password' => 'hashed_password',
+    'age' => 30,
+    'is_active' => true,
+    'roles' => ['user', 'admin'],
+    'profile' => [
+        'bio' => 'Software Developer',
+        'location' => 'New York',
+        'website' => 'https://example.com',
+        'avatar' => 'https://example.com/avatar.jpg'
+    ]
+]);
+
+// Save the user to Elasticsearch
+$user->save();
+
+// Find a user by ID
+$user = User::find('user_id');
+
+// Update user attributes
+$user->setName('Jane Doe');
+$user->setAge(31);
+$user->save();
+
+// Delete a user
+$user->delete();
+
+// Query users
+$activeUsers = User::where('is_active', true)
+    ->where('age', '>', 25)
+    ->get();
+
+// Convert to Spatie Data DTO
+$userData = $user->toData();
+
+// Use DTO in API responses
+return response()->json($userData->toArray());
+
+// Or use Spatie Data's collection
+$usersData = $activeUsers->map(fn($user) => $user->toData());
+return response()->json($usersData->toArray());
+```
+
+### Available Query Methods
+
+The User model supports all standard Eloquent-like query methods:
+
+```php
+// Basic queries
+User::all();
+User::find('id');
+User::first();
+User::where('age', '>', 25)->get();
+
+// Pagination
+User::paginate(15);
+User::simplePaginate(15);
+User::cursorPaginate(15);
+
+// Aggregations
+User::where('is_active', true)->count();
+User::where('age', '>', 25)->exists();
+
+// Nested queries
+User::where('profile.location', 'New York')->get();
+
+// Sorting
+User::orderBy('created_at', 'desc')->get();
+
+// Limiting
+User::limit(10)->get();
+User::offset(5)->limit(10)->get();
+```
+
+### Elasticsearch Features
+
+The User model includes several Elasticsearch-specific features:
+
+1. **Nested Fields**: The `profile` field is defined as a nested type, allowing for complex queries on nested objects.
+
+2. **Field Types**:
+   - `text` for full-text search (name, profile.bio)
+   - `keyword` for exact matches (email, roles)
+   - `integer` for numeric values (age)
+   - `boolean` for true/false values (is_active)
+   - `date` for timestamps (created_at, updated_at)
+
+3. **Index Settings**:
+   - Single shard for consistent ordering
+   - One replica for high availability
+
+4. **Mapping**:
+   - Custom field mappings for optimal search performance
+   - Nested object support for complex data structures
+
+5. **Spatie Data Integration**:
+   - Automatic snake_case to camelCase conversion
+   - Type-safe data transfer objects
+   - Built-in validation and transformation
+   - Easy serialization to JSON
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
