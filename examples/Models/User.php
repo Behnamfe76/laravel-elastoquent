@@ -39,34 +39,36 @@ class UserData extends Data
 #[Elasticsearch]
 #[ElasticsearchIndex('users')]
 #[ElasticsearchType('_doc')]
-#[ElasticsearchMapping([
-    'properties' => [
-        'id' => ['type' => 'keyword'],
-        'name' => ['type' => 'text'],
-        'email' => ['type' => 'keyword'],
-        'password' => ['type' => 'keyword'],
-        'age' => ['type' => 'integer'],
-        'is_active' => ['type' => 'boolean'],
-        'created_at' => ['type' => 'date'],
-        'updated_at' => ['type' => 'date'],
-        'roles' => ['type' => 'keyword'],
-        'profile' => [
-            'type' => 'nested',
-            'properties' => [
-                'bio' => ['type' => 'text'],
-                'location' => ['type' => 'keyword'],
-                'website' => ['type' => 'keyword'],
-                'avatar' => ['type' => 'keyword']
-            ]
-        ]
-    ]
-])]
+#[ElasticsearchMapping(self::MAPPING)]
 #[ElasticsearchSettings([
     'number_of_shards' => 1,
     'number_of_replicas' => 1
 ])]
 class User extends Model
 {
+    private const MAPPING = [
+        'properties' => [
+            'id' => ['type' => 'keyword'],
+            'name' => ['type' => 'text'],
+            'email' => ['type' => 'keyword'],
+            'password' => ['type' => 'keyword'],
+            'age' => ['type' => 'integer'],
+            'is_active' => ['type' => 'boolean'],
+            'created_at' => ['type' => 'date'],
+            'updated_at' => ['type' => 'date'],
+            'roles' => ['type' => 'keyword'],
+            'profile' => [
+                'type' => 'nested',
+                'properties' => [
+                    'bio' => ['type' => 'text'],
+                    'location' => ['type' => 'keyword'],
+                    'website' => ['type' => 'keyword'],
+                    'avatar' => ['type' => 'keyword']
+                ]
+            ]
+        ]
+    ];
+
     #[ElasticsearchId]
     protected ?string $id = null;
 
@@ -218,5 +220,10 @@ class User extends Model
             createdAt: $this->createdAt,
             updatedAt: $this->updatedAt
         );
+    }
+
+    public static function getMapping(): array
+    {
+        return self::MAPPING;
     }
 } 

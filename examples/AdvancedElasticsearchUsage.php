@@ -5,6 +5,7 @@
 use Fereydooni\LaravelElastoquent\Attributes\ElasticField;
 use Fereydooni\LaravelElastoquent\Attributes\ElasticModel;
 use Fereydooni\LaravelElastoquent\Models\Model;
+use Fereydooni\LaravelElastoquent\Enums\ElasticsearchFieldType;
 
 // 1. Advanced model with sparse vectors for ELSER
 #[ElasticModel(
@@ -26,19 +27,19 @@ use Fereydooni\LaravelElastoquent\Models\Model;
 class Document extends Model
 {
     // Dense vector field for standard vector search
-    #[ElasticField(type: 'dense_vector', options: ['dims' => 768])]
+    #[ElasticField(type: ElasticsearchFieldType::DENSE_VECTOR, options: ['dims' => 768])]
     public array $embedding;
     
     // Sparse vector field for ELSER
-    #[ElasticField(type: 'sparse_vector')]
+    #[ElasticField(type: ElasticsearchFieldType::SPARSE_VECTOR)]
     public array $content_embedding;
     
     // Text field for normal search
-    #[ElasticField(type: 'text', options: ['analyzer' => 'content_analyzer'])]
+    #[ElasticField(type: ElasticsearchFieldType::TEXT, options: ['analyzer' => 'content_analyzer'])]
     public string $content;
     
     // Field for sorting/filtering
-    #[ElasticField(type: 'keyword')]
+    #[ElasticField(type: ElasticsearchFieldType::KEYWORD)]
     public string $category;
     
     // Automatically use timestamps
@@ -64,39 +65,30 @@ $results = Document::search("artificial intelligence")
 
 // Vector search with KNN
 $results = Document::query()
-    ->vectorSearch('embedding', $queryVector, k: 10)
+    ->vectorSearch('embedding', $queryVector, 10)
     ->get();
 
 // Sparse vector search with ELSER
 $results = Document::query()
-    ->sparseVectorSearch("How does AI work?", 'content_embedding')
+    ->sparseVectorSearch('content_embedding', ['token1' => 0.5, 'token2' => 0.3])
     ->get();
 
 // Hybrid search with both text and vectors
 $results = Document::query()
     ->hybridSearch(
-        "machine learning applications", 
-        ['content'], 
-        'embedding',
-        $queryVector, 
-        textWeight: 0.3, 
-        vectorWeight: 0.7
+        "machine learning applications",
+        ['content'],
+        ['embedding' => $queryVector]
     )
     ->get();
 
 // Semantic search using embedding service
 $results = Document::query()
     ->semanticSearch(
-        "What are neural networks?", 
-        'embedding', 
-        'openai'
+        "What are neural networks?",
+        'openai',
+        ['embedding' => $queryVector]
     )
-    ->get();
-
-// Semantic reranking
-$results = Document::query()
-    ->search("machine learning")
-    ->semanticRerank("machine learning applications")
     ->get();
 
 // Using ES|QL for advanced queries
@@ -112,11 +104,10 @@ $results = Document::query()
     ->search("machine learning")
     ->get();
 
-// 5. Using retrievers
+// 5. Using search with fields
 $results = Document::query()
-    ->retriever(
+    ->search(
         "How does machine learning work?",
-        ['content'],
-        'hybrid'
+        ['content']
     )
     ->get(); 
