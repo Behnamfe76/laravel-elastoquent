@@ -3,6 +3,7 @@
     "description": "A robust Elasticsearch ORM for Laravel, mirroring Eloquent functionality",
     "type": "library",
     "license": "MIT",
+    "version": "1.0.0-beta",
     "autoload": {
         "psr-4": {
             "Fereydooni\\LaravelElastoquent\\": "src/"
