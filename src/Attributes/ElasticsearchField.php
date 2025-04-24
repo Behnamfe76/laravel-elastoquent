@@ -10,7 +10,7 @@ class ElasticsearchField
 {
     public function __construct(
         public ElasticsearchFieldType $type,
-        public ?array $options = null
+        public array $options = []
     ) {
     }
 
