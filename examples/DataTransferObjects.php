@@ -7,24 +7,25 @@ use Fereydooni\LaravelElastoquent\Attributes\ElasticModel;
 use Fereydooni\LaravelElastoquent\Data\ElasticDocument;
 use Fereydooni\LaravelElastoquent\Models\Model;
 use Spatie\LaravelData\Data;
+use Fereydooni\LaravelElastoquent\Enums\ElasticsearchFieldType;
 
 // 1. Define your Elasticsearch model as before
 #[ElasticModel(index: 'products')]
 class Product extends Model
 {
-    #[ElasticField(type: 'text')]
+    #[ElasticField(type: ElasticsearchFieldType::TEXT)]
     public string $name;
 
-    #[ElasticField(type: 'keyword')]
+    #[ElasticField(type: ElasticsearchFieldType::KEYWORD)]
     public string $sku;
 
-    #[ElasticField(type: 'double')]
+    #[ElasticField(type: ElasticsearchFieldType::DOUBLE)]
     public float $price;
 
-    #[ElasticField(type: 'text')]
+    #[ElasticField(type: ElasticsearchFieldType::TEXT)]
     public string $description;
 
-    #[ElasticField(type: 'keyword')]
+    #[ElasticField(type: ElasticsearchFieldType::KEYWORD)]
     public string $category;
 }
 
