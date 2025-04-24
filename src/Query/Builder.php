@@ -95,6 +95,16 @@ class Builder
     protected array $with = [];
 
     /**
+     * The result type for the query.
+     */
+    protected ?string $resultType = null;
+
+    /**
+     * The document class for custom document DTOs.
+     */
+    protected ?string $documentClass = null;
+
+    /**
      * Create a new Elasticsearch query builder instance.
      */
     public function __construct(ElasticManager $elasticManager)
@@ -114,6 +124,25 @@ class Builder
             $this->whereNull('_deleted_at');
         }
 
+        return $this;
+    }
+
+    /**
+     * Set the result type to document.
+     */
+    public function asDocument(): self
+    {
+        $this->resultType = 'document';
+        return $this;
+    }
+
+    /**
+     * Set the result type to use a custom document DTO class.
+     */
+    public function asData(string $documentClass): self
+    {
+        $this->resultType = 'document';
+        $this->documentClass = $documentClass;
         return $this;
     }
 
@@ -555,42 +584,14 @@ class Builder
      */
     public function get(): Collection
     {
-        $params = $this->buildParams();
-        $result = [];
-        
-        // Use ES|QL endpoint if esqlQuery is set
-        if ($this->esqlQuery !== null) {
-            $result = $this->elasticManager->esql(
-                $params['esql'],
-                [
-                    'from' => $this->from,
-                    'size' => $this->size,
-                ]
-            );
-        } else {
-            $result = $this->elasticManager->search(
-                $this->model::getIndexName(),
-                $params,
-                [
-                    'from' => $this->from,
-                    'size' => $this->size,
-                    'sort' => $this->sort,
-                ]
-            );
+        $params = $this->buildQuery();
+        $response = $this->elasticManager->getClient()->search($params);
+
+        if ($this->resultType === 'document') {
+            return new Collection($response['hits']['hits']);
         }
 
-        $collection = new Collection();
-
-        foreach ($result['hits'] as $hit) {
-            $data = $hit['_source'] ?? [];
-            $data['_id'] = $hit['_id'];
-            $data['_score'] = $hit['_score'] ?? null;
-
-            $model = $this->model::newFromElasticData($data);
-            $collection->push($model);
-        }
-
-        return $collection;
+        return $this->hydrate($response->asArray());
     }
 
     /**
@@ -1716,5 +1717,56 @@ class Builder
         ];
 
         return $this;
+    }
+
+    /**
+     * Build the Elasticsearch query parameters.
+     */
+    protected function buildQuery(): array
+    {
+        $params = [
+            'index' => $this->model::getIndexName(),
+            'body' => [
+                'query' => $this->query,
+            ],
+        ];
+
+        if ($this->from !== null) {
+            $params['from'] = $this->from;
+        }
+
+        if ($this->size !== null) {
+            $params['size'] = $this->size;
+        }
+
+        if (!empty($this->sort)) {
+            $params['sort'] = $this->sort;
+        }
+
+        return $params;
+    }
+
+    /**
+     * Hydrate the search results into model instances.
+     */
+    protected function hydrate(array $response): Collection
+    {
+        $collection = new Collection();
+
+        foreach ($response['hits']['hits'] as $hit) {
+            $data = $hit['_source'] ?? [];
+            $data['_id'] = $hit['_id'];
+            $data['_score'] = $hit['_score'] ?? null;
+
+            if ($this->documentClass) {
+                $model = new $this->documentClass($data);
+            } else {
+                $model = $this->model::newFromElasticData($data);
+            }
+            
+            $collection->push($model);
+        }
+
+        return $collection;
     }
 } 
