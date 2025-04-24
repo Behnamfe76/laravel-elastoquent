@@ -274,7 +274,8 @@ abstract class Model
      */
     public static function newFromElasticData(array $data): self
     {
-        $model = new static();
+        $class = static::class;
+        $model = new $class();
         
         // Set ID if present
         if (isset($data['_id'])) {
@@ -303,9 +304,13 @@ abstract class Model
         
         $data = $this->attributes;
         
-        // Add timestamps if necessary
-        if (method_exists($this, 'addTimestamps')) {
-            $this->addTimestamps();
+        // Add timestamps if defined in the model
+        if (property_exists($this, 'timestamps') && $this->timestamps) {
+            $now = now()->toIso8601String();
+            if (!$this->exists) {
+                $this->setAttribute('created_at', $now);
+            }
+            $this->setAttribute('updated_at', $now);
         }
         
         $result = static::getElasticManager()->index(
@@ -396,7 +401,8 @@ abstract class Model
      */
     public static function create(array $attributes = []): self
     {
-        $model = new static($attributes);
+        $class = static::class;
+        $model = new $class($attributes);
         $model->save();
         
         return $model;

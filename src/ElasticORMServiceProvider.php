@@ -53,12 +53,20 @@ class ElasticORMServiceProvider extends ServiceProvider
             }
 
             // Timeouts
+            $httpClientOptions = [];
+            
             if (isset($config['connection_timeout'])) {
-                $clientBuilder->setConnectionTimeout($config['connection_timeout']);
+                $httpClientOptions['connect_timeout'] = $config['connection_timeout'];
             }
 
             if (isset($config['request_timeout'])) {
-                $clientBuilder->setRequestTimeout($config['request_timeout']);
+                $httpClientOptions['timeout'] = $config['request_timeout'];
+            }
+            
+            if (!empty($httpClientOptions)) {
+                $clientBuilder->setHttpClient(
+                    new \GuzzleHttp\Client($httpClientOptions)
+                );
             }
 
             // Retries

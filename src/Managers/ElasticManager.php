@@ -463,6 +463,65 @@ class ElasticManager
     }
 
     /**
+     * Execute an ES|QL query.
+     *
+     * @param string $query The ES|QL query
+     * @param array $options Additional query options
+     * @return array The query result
+     */
+    public function esql(string $query, array $options = []): array
+    {
+        try {
+            // Prepare the request body
+            $body = [
+                'query' => $query
+            ];
+
+            // Add options
+            if (isset($options['from'])) {
+                $body['from'] = $options['from'];
+            }
+
+            if (isset($options['size'])) {
+                $body['size'] = $options['size'];
+            }
+
+            // Use a raw HTTP request since ES|QL might not be available in the client
+            $response = $this->client->searchTemplate([
+                'body' => [
+                    'source' => '{"esql": {"query": "{{query}}"}}',
+                    'params' => [
+                        'query' => $query
+                    ]
+                ]
+            ]);
+            
+            $result = $response->asArray();
+            
+            // Transform result to match search() output format for consistency
+            return [
+                'total' => $result['hits']['total']['value'] ?? 0,
+                'hits' => $result['hits']['hits'] ?? [],
+                'aggregations' => $result['aggregations'] ?? [],
+            ];
+        } catch (ClientResponseException|ServerResponseException $e) {
+            $this->logError("ES|QL query error: " . $e->getMessage());
+            return [
+                'total' => 0,
+                'hits' => [],
+                'aggregations' => [],
+            ];
+        } catch (\Exception $e) {
+            $this->logError("ES|QL query error: " . $e->getMessage());
+            return [
+                'total' => 0,
+                'hits' => [],
+                'aggregations' => [],
+            ];
+        }
+    }
+
+    /**
      * Log an info message if logging is enabled.
      */
     protected function logInfo(string $message): void
