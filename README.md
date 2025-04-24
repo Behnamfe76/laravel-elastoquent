@@ -125,6 +125,162 @@ $results = User::search('John')
     ->get();
 ```
 
+### Advanced Elasticsearch Features
+
+#### Vector Search
+
+```php
+// Define a model with vector fields
+#[ElasticModel(index: 'documents')]
+class Document extends Model
+{
+    #[ElasticField(type: 'dense_vector', options: ['dims' => 768])]
+    public array $embedding;
+    
+    #[ElasticField(type: 'text')]
+    public string $content;
+}
+
+// Perform KNN vector search
+$results = Document::query()
+    ->vectorSearch('embedding', $queryVector, k: 10)
+    ->get();
+```
+
+#### Semantic Search
+
+```php
+// Using embedding services (OpenAI, HuggingFace, etc.)
+$results = Document::query()
+    ->semanticSearch(
+        "What is machine learning?", 
+        'embedding', 
+        'openai'
+    )
+    ->get();
+
+// Sparse vector search with ELSER
+$results = Document::query()
+    ->sparseVectorSearch("How does AI work?", 'content_embedding')
+    ->get();
+```
+
+#### Hybrid Search & Semantic Reranking
+
+```php
+// Hybrid search combining text and vector scores
+$results = Document::query()
+    ->hybridSearch(
+        "machine learning applications", 
+        ['content'], 
+        'embedding',
+        $queryVector, 
+        textWeight: 0.3, 
+        vectorWeight: 0.7
+    )
+    ->get();
+    
+// Semantic reranking to improve relevance
+$results = Document::query()
+    ->search("artificial intelligence")
+    ->semanticRerank("How do neural networks work?")
+    ->get();
+```
+
+#### ES|QL Support
+
+```php
+// Using Elasticsearch's SQL-like query language
+$results = Document::query()
+    ->esql("FROM documents WHERE match(content, 'artificial intelligence') | LIMIT 10")
+    ->get();
+```
+
+#### Performance Optimizations
+
+```php
+// Field selection and exclusion
+$results = Document::query()
+    ->select(['content', 'title'])    // Only return these fields
+    ->exclude(['embedding'])          // Exclude large vector fields
+    ->trackTotalHits(false)           // Disable exact hit counting for better performance
+    ->search("machine learning")
+    ->get();
+```
+
+### Data Transfer Objects & Pagination
+
+Laravel Elastoquent integrates with [spatie/laravel-data](https://github.com/spatie/laravel-data) to provide structured DTOs for your Elasticsearch results:
+
+```php
+// Using the built-in ElasticDocument DTO
+$results = Document::query()
+    ->where('category', 'technology')
+    ->asDocument()  // Return results as ElasticDocument DTOs
+    ->get();
+
+// Using a custom DTO that extends ElasticDocument
+class ProductDocument extends ElasticDocument 
+{
+    public function getFormattedPrice(): string
+    {
+        return '$' . number_format($this->field('price', 0), 2);
+    }
+}
+
+$results = Product::query()
+    ->asData(ProductDocument::class)  // Use custom DTOs
+    ->get();
+
+// Enhanced pagination with DTOs
+$paginatedResults = Product::query()
+    ->where('active', true)
+    ->asDocument()
+    ->paginate(15);
+
+// Accessing pagination metadata
+echo "Showing {$paginatedResults->count()} of {$paginatedResults->total()} results";
+echo "Page {$paginatedResults->currentPage()} of {$paginatedResults->lastPage()}";
+
+// Converting to Spatie Data collection
+use Spatie\LaravelData\Data;
+
+class ProductData extends Data
+{
+    public function __construct(
+        public string $id,
+        public string $name,
+        public float $price,
+    ) {}
+    
+    // Transform from ElasticDocument to Spatie Data
+    public static function fromElasticDocument(ElasticDocument $doc): self
+    {
+        return new self(
+            id: $doc->id,
+            name: $doc->field('name'),
+            price: (float)$doc->field('price', 0)
+        );
+    }
+}
+
+// Map the results to Spatie Data objects
+$dataCollection = $results->map(fn($doc) => ProductData::fromElasticDocument($doc));
+```
+
+### Retriever API Support
+
+```php
+// Using retrievers for advanced semantic search
+$results = Document::query()
+    ->retriever(
+        "How does machine learning work?",
+        ['content'],
+        'hybrid'  // Use hybrid retrieval (text + semantic)
+    )
+    ->get();
+```
+
 ### Relationships
 
 ```php
